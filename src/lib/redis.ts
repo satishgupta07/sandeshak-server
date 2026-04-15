@@ -1,10 +1,13 @@
 import Redis from 'ioredis'
 
 const redis = new Redis(process.env.REDIS_URL ?? 'redis://localhost:6379', {
+  // Add the password explicitly
+  password: process.env.REDIS_PASSWORD ?? 'redispass',
+
   // Don't auto-connect — we connect explicitly in src/index.ts
-  // so the app never starts before Redis is ready.
   lazyConnect: true,
   maxRetriesPerRequest: 3,
+
   // Retry with exponential backoff, capped at 3 s
   retryStrategy: (times) => Math.min(times * 200, 3000),
 })
