@@ -1,0 +1,36 @@
+// Prisma schema — source of truth for the database structure.
+// After editing this file run:
+//   npx prisma migrate dev --name <description>
+//
+// Full schema reference: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Users ───────────────────────────────────────────────────────────────────
+
+model User {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email        String    @unique                @db.VarChar(255)
+  name         String                           @db.VarChar(100)
+  passwordHash String    @map("password_hash")
+  isVerified   Boolean   @default(false)        @map("is_verified")
+  avatarUrl    String?   @map("avatar_url")
+  bio          String?                          @db.VarChar(139)
+  lastSeen     DateTime? @map("last_seen")
+
+  // Privacy: controls who can see lastSeen / avatar / bio
+  // Values per field: "everyone" | "contacts" | "nobody"
+  privacy Json @default("{\"lastSeen\":\"everyone\",\"avatar\":\"everyone\",\"status\":\"everyone\"}")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt      @map("updated_at")
+
+  @@map("users")
+}

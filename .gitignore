@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.env
+*.log
+.DS_Store
+
+# Docker
+docker-compose.override.yml
+
+/src/generated/prisma
