@@ -22,6 +22,7 @@ async function main() {
 
 main().catch((err) => {
   console.error('[startup] Failed to start server:', err)
+  // eslint-disable-next-line n/no-process-exit
   process.exit(1)
 })
 
@@ -35,6 +36,7 @@ async function shutdown(signal: string) {
   console.log('[db] disconnected')
   await redis.quit()
   console.log('[redis] disconnected')
+  // eslint-disable-next-line n/no-process-exit
   process.exit(0)
 }
 

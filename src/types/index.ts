@@ -28,8 +28,8 @@ export interface PaginatedResponse<T> {
 
 /** Standard query params for paginated list endpoints */
 export interface PaginationQuery {
-  page?: number   // default: 1
-  limit?: number  // default: 20, max: 100
+  page?: number // default: 1
+  limit?: number // default: 20, max: 100
   cursor?: string // cursor-based pagination (message history)
 }
 
@@ -37,8 +37,8 @@ export interface PaginationQuery {
 
 export interface RegisterRequest {
   email: string
-  password: string  // min 8 chars, validated server-side
-  name: string      // max 100 chars
+  password: string // min 8 chars, validated server-side
+  name: string // max 100 chars
 }
 
 export interface LoginRequest {
@@ -56,11 +56,21 @@ export interface ResetPasswordRequest {
 }
 
 export interface AuthTokens {
-  accessToken: string   // JWT, 15-minute TTL
-  refreshToken: string  // opaque token, 30-day TTL, stored in Redis
+  accessToken: string // JWT, 15-minute TTL
+  refreshToken: string // opaque token, 30-day TTL, stored in Redis
+}
+
+/** Response payload for register / login — wrapped in ApiResponse<AuthResponse> */
+export interface AuthResponse {
+  user: UserDTO
+  tokens: AuthTokens
 }
 
 export interface RefreshRequest {
+  refreshToken: string
+}
+
+export interface LogoutRequest {
   refreshToken: string
 }
 
@@ -71,9 +81,10 @@ export interface UserDTO {
   email: string
   name: string
   avatarUrl: string | null
-  bio: string | null        // max 139 chars
-  lastSeen: string | null   // ISO 8601, null if hidden by privacy settings
+  bio: string | null // max 139 chars
+  lastSeen: string | null // ISO 8601, null if hidden by privacy settings
   isOnline: boolean
+  isVerified: boolean // email verification status
   createdAt: string
 }
 
@@ -112,9 +123,9 @@ export type ConversationType = 'direct' | 'group'
 export interface ConversationDTO {
   id: string
   type: ConversationType
-  name: string | null          // null for direct conversations
+  name: string | null // null for direct conversations
   avatarUrl: string | null
-  description: string | null   // groups only
+  description: string | null // groups only
   lastMessage: MessageDTO | null
   unreadCount: number
   participants: ParticipantDTO[]
@@ -136,7 +147,7 @@ export interface CreateDirectConversationRequest {
 
 export interface CreateGroupRequest {
   name: string
-  memberIds: string[]  // user IDs to add (creator is added automatically as admin)
+  memberIds: string[] // user IDs to add (creator is added automatically as admin)
   avatarUrl?: string
   description?: string
 }
@@ -157,14 +168,7 @@ export interface UpdateParticipantRoleRequest {
 
 // ─── Message ─────────────────────────────────────────────────────────────────
 
-export type MessageType =
-  | 'text'
-  | 'image'
-  | 'video'
-  | 'audio'
-  | 'document'
-  | 'voice'
-  | 'system'
+export type MessageType = 'text' | 'image' | 'video' | 'audio' | 'document' | 'voice' | 'system'
 
 export type MessageStatus = 'sending' | 'sent' | 'delivered' | 'read'
 
@@ -173,9 +177,9 @@ export interface MessageDTO {
   conversationId: string
   senderId: string
   type: MessageType
-  content: string | null      // encrypted ciphertext (Phase 5: E2EE)
+  content: string | null // encrypted ciphertext (Phase 5: E2EE)
   mediaUrl: string | null
-  thumbUrl: string | null     // server-generated thumbnail for images/videos
+  thumbUrl: string | null // server-generated thumbnail for images/videos
   replyTo: MessageReplyDTO | null
   reactions: ReactionDTO[]
   isDeleted: boolean
@@ -221,13 +225,13 @@ export interface PresignRequest {
   fileName: string
   mimeType: string
   mediaType: MediaType
-  fileSize: number  // bytes — validated against per-type limits server-side
+  fileSize: number // bytes — validated against per-type limits server-side
 }
 
 export interface PresignResponse {
-  uploadUrl: string   // pre-signed S3/MinIO URL — PUT directly from client
-  key: string         // object key in the bucket
-  expiresIn: number   // seconds until uploadUrl expires
+  uploadUrl: string // pre-signed S3/MinIO URL — PUT directly from client
+  key: string // object key in the bucket
+  expiresIn: number // seconds until uploadUrl expires
 }
 
 export interface MediaConfirmRequest {
@@ -235,7 +239,7 @@ export interface MediaConfirmRequest {
 }
 
 export interface MediaConfirmResponse {
-  url: string       // permanent CDN URL
+  url: string // permanent CDN URL
   thumbUrl: string | null
 }
 
@@ -256,16 +260,9 @@ export interface ServerToClientEvents {
     timestamp: string
   }) => void
 
-  'message:deleted': (payload: {
-    messageId: string
-    conversationId: string
-  }) => void
+  'message:deleted': (payload: { messageId: string; conversationId: string }) => void
 
-  'message:edited': (payload: {
-    messageId: string
-    content: string
-    updatedAt: string
-  }) => void
+  'message:edited': (payload: { messageId: string; content: string; updatedAt: string }) => void
 
   'message:reaction': (payload: {
     messageId: string
@@ -273,11 +270,7 @@ export interface ServerToClientEvents {
     reaction: ReactionDTO
   }) => void
 
-  'typing': (payload: {
-    conversationId: string
-    userId: string
-    isTyping: boolean
-  }) => void
+  typing: (payload: { conversationId: string; userId: string; isTyping: boolean }) => void
 
   'presence:update': (payload: {
     userId: string
@@ -287,15 +280,9 @@ export interface ServerToClientEvents {
 
   'conversation:new': (conversation: ConversationDTO) => void
 
-  'group:member:added': (payload: {
-    conversationId: string
-    participant: ParticipantDTO
-  }) => void
+  'group:member:added': (payload: { conversationId: string; participant: ParticipantDTO }) => void
 
-  'group:member:removed': (payload: {
-    conversationId: string
-    userId: string
-  }) => void
+  'group:member:removed': (payload: { conversationId: string; userId: string }) => void
 }
 
 /** Events emitted BY clients, received BY the server */
@@ -308,10 +295,7 @@ export interface ClientToServerEvents {
     replyToId?: string
   }) => void
 
-  'message:read': (payload: {
-    conversationId: string
-    messageId: string
-  }) => void
+  'message:read': (payload: { conversationId: string; messageId: string }) => void
 
   'typing:start': (payload: { conversationId: string }) => void
   'typing:stop': (payload: { conversationId: string }) => void

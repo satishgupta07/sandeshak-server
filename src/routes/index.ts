@@ -1,10 +1,15 @@
-import { Router } from 'express';
+import { Router } from 'express'
+import authRouter from './auth.routes'
+import usersRouter from './users.routes'
+import mediaRouter from './media.routes'
 
-const router = Router();
+const router = Router()
 
-// Placeholder — routes added per phase
-// e.g. router.use('/auth', authRouter);
-// e.g. router.use('/users', usersRouter);
-// e.g. router.use('/conversations', conversationsRouter);
+router.use('/auth', authRouter)
+router.use('/users', usersRouter)
+router.use('/media', mediaRouter)
 
-export default router;
+// Future phases:
+//   router.use('/conversations', conversationsRouter)
+
+export default router
