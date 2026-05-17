@@ -9,6 +9,15 @@ import { registerTypingHandlers } from './handlers/typing'
 import { joinUserConversationRooms } from './rooms'
 import type { AppServer } from './types'
 
+// Module-scoped reference so non-socket code (REST routes) can publish events
+// without plumbing the io instance through Express. Returned by getIo() once
+// createSocketServer has run.
+let currentIo: AppServer | null = null
+
+export function getIo(): AppServer | null {
+  return currentIo
+}
+
 export async function createSocketServer(httpServer: HttpServer): Promise<AppServer> {
   const io: AppServer = new Server(httpServer, {
     cors: {
@@ -54,5 +63,6 @@ export async function createSocketServer(httpServer: HttpServer): Promise<AppSer
     })
   })
 
+  currentIo = io
   return io
 }

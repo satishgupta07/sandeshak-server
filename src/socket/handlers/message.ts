@@ -1,5 +1,6 @@
 import prisma from '../../lib/prisma'
 import { toMessageDTO, type DbMessage } from '../../lib/dto'
+import { getOnlineUserIds } from '../../lib/presence'
 import { readMessageEventSchema, sendMessageEventSchema } from '../../validators/socket.schema'
 import { conversationRoom, type AppServer, type AppSocket } from '../types'
 
@@ -10,6 +11,52 @@ const replyToSelect = {
   content: true,
   mediaUrl: true,
 } as const
+
+async function deliverToOnlineRecipients(
+  io: AppServer,
+  conversationId: string,
+  messageId: string,
+  senderId: string,
+): Promise<void> {
+  try {
+    const others = await prisma.conversationParticipant.findMany({
+      where: { conversationId, userId: { not: senderId } },
+      select: { userId: true },
+    })
+    const otherIds = others.map((o) => o.userId)
+    if (otherIds.length === 0) return
+
+    const online = await getOnlineUserIds(otherIds)
+    if (online.size === 0) return
+
+    const timestamp = new Date()
+    const deliveredIds = [...online]
+
+    // skipDuplicates guards against the rare case of an existing receipt
+    // (e.g. recipient's client already raced ahead with message:read).
+    await prisma.messageReceipt.createMany({
+      data: deliveredIds.map((userId) => ({
+        messageId,
+        userId,
+        status: 'delivered' as const,
+        timestamp,
+      })),
+      skipDuplicates: true,
+    })
+
+    const ts = timestamp.toISOString()
+    for (const userId of deliveredIds) {
+      io.to(conversationRoom(conversationId)).emit('message:receipt', {
+        messageId,
+        userId,
+        status: 'delivered',
+        timestamp: ts,
+      })
+    }
+  } catch (err) {
+    console.error('[socket] deliverToOnlineRecipients failed:', err)
+  }
+}
 
 export function registerMessageHandlers(io: AppServer, socket: AppSocket): void {
   socket.on('message:send', async (payload) => {
@@ -47,6 +94,11 @@ export function registerMessageHandlers(io: AppServer, socket: AppSocket): void 
 
       const dto = toMessageDTO(message as unknown as DbMessage)
       io.to(conversationRoom(conversationId)).emit('message:new', dto)
+
+      // Auto-emit 'delivered' receipts for any *other* participants whose
+      // socket is currently connected. The recipient's client will later
+      // emit message:read when the user actually opens the conversation.
+      void deliverToOnlineRecipients(io, conversationId, message.id, userId)
     } catch (err) {
       console.error('[socket] message:send failed:', err)
     }

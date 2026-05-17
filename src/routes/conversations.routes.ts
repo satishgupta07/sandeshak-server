@@ -9,7 +9,25 @@ import {
   type CreateDirectConversationInput,
 } from '../validators/conversation.schema'
 import { toConversationDTO, toMessageDTO, type DbConversation, type DbMessage } from '../lib/dto'
+import { getOnlineUserIds } from '../lib/presence'
+import { getIo } from '../socket'
+import { conversationRoom, userRoom } from '../socket/types'
 import type { ConversationDTO, MessageDTO, PaginatedResponse } from '../types'
+
+// UserDTO.isOnline is part of the contract but toUserDTO can't compute it
+// without a Redis round-trip. We populate it post-hoc on freshly-built DTOs
+// so the mapper layer stays sync. Mutates in place.
+async function annotateOnlinePresence(convs: ConversationDTO[]): Promise<void> {
+  const allUserIds = new Set<string>()
+  for (const c of convs) for (const p of c.participants) allUserIds.add(p.userId)
+  if (allUserIds.size === 0) return
+  const online = await getOnlineUserIds([...allUserIds])
+  for (const c of convs) {
+    for (const p of c.participants) {
+      p.user.isOnline = online.has(p.userId)
+    }
+  }
+}
 
 const router = Router()
 router.use(requireAuth)
@@ -114,6 +132,20 @@ router.post(
         }))
 
       const dto = await hydrateConversation(conv as unknown as DbConversation, userId)
+      await annotateOnlinePresence([dto])
+
+      if (!existing) {
+        // Subscribe both users' currently-connected sockets to the new room
+        // so they receive subsequent message:new events, then notify them.
+        const io = getIo()
+        if (io) {
+          const room = conversationRoom(conv.id)
+          await io.in(userRoom(userId)).socketsJoin(room)
+          await io.in(userRoom(participantId)).socketsJoin(room)
+          io.to(userRoom(userId)).to(userRoom(participantId)).emit('conversation:new', dto)
+        }
+      }
+
       res.status(existing ? 200 : 201).json({ data: dto })
     } catch (err) {
       next(err)
@@ -139,6 +171,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction): Promise
     const data = await Promise.all(
       convs.map((c) => hydrateConversation(c as unknown as DbConversation, userId)),
     )
+    await annotateOnlinePresence(data)
     res.json({ data })
   } catch (err) {
     next(err)

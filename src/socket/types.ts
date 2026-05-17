@@ -12,4 +12,5 @@ export type AppServer = Server<ClientToServerEvents, ServerToClientEvents, Empty
 export type AppSocket = Socket<ClientToServerEvents, ServerToClientEvents, EmptyEvents, SocketData>
 
 export const conversationRoom = (conversationId: string): string => `conv:${conversationId}`
+export const userRoom = (userId: string): string => `user:${userId}`
 export const presenceSetKey = (userId: string): string => `presence:${userId}`
