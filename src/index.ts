@@ -1,7 +1,9 @@
 import 'dotenv/config'
+import { createServer } from 'node:http'
 import app from './app'
 import prisma from './lib/prisma'
 import redis from './lib/redis'
+import { createSocketServer } from './socket'
 
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000
 
@@ -13,8 +15,13 @@ async function main() {
   // 2. Connect to Redis
   await redis.connect()
 
-  // 3. Start HTTP server — only after both connections are healthy
-  app.listen(PORT, () => {
+  // 3. Wrap Express in an http.Server so Socket.io can share the port
+  const httpServer = createServer(app)
+  await createSocketServer(httpServer)
+  console.log('[socket] Socket.io attached')
+
+  // 4. Start HTTP server — only after all connections are healthy
+  httpServer.listen(PORT, () => {
     console.log(`[server] Running on http://localhost:${PORT}`)
     console.log(`[server] Environment: ${process.env.NODE_ENV ?? 'development'}`)
   })
