@@ -31,12 +31,9 @@ export async function createSocketServer(httpServer: HttpServer): Promise<AppSer
 
   // Redis adapter — required for horizontal scaling. Two clients: one to
   // publish, one to subscribe (single-subscriber-per-connection rule).
-  const pubClient = redis.duplicate({ lazyConnect: false })
-  const subClient = redis.duplicate({ lazyConnect: false })
-  await Promise.all([
-    pubClient.status === 'ready' ? Promise.resolve() : pubClient.connect(),
-    subClient.status === 'ready' ? Promise.resolve() : subClient.connect(),
-  ])
+  const pubClient = redis.duplicate({ lazyConnect: true })
+  const subClient = redis.duplicate({ lazyConnect: true })
+  await Promise.all([pubClient.connect(), subClient.connect()])
   io.adapter(createAdapter(pubClient, subClient))
 
   io.use(socketAuth)
