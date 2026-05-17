@@ -32,5 +32,115 @@ model User {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt      @map("updated_at")
 
+  conversations ConversationParticipant[]
+  messagesSent  Message[]                 @relation("MessagesSent")
+  receipts      MessageReceipt[]
+
   @@map("users")
+}
+
+// ─── Conversations ───────────────────────────────────────────────────────────
+
+model Conversation {
+  id          String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  type        ConversationType
+  name        String?          @db.VarChar(100)
+  avatarUrl   String?          @map("avatar_url")
+  description String?          @db.VarChar(500)
+  createdBy   String           @map("created_by") @db.Uuid
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt      @map("updated_at")
+
+  participants ConversationParticipant[]
+  messages     Message[]
+
+  @@map("conversations")
+}
+
+enum ConversationType {
+  direct
+  group
+
+  @@map("conversation_type")
+}
+
+model ConversationParticipant {
+  conversationId String          @map("conversation_id") @db.Uuid
+  userId         String          @map("user_id")         @db.Uuid
+  role           ParticipantRole @default(member)
+  joinedAt       DateTime        @default(now())         @map("joined_at")
+  lastReadAt     DateTime?       @map("last_read_at")
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([conversationId, userId])
+  @@index([userId])
+  @@map("conversation_participants")
+}
+
+enum ParticipantRole {
+  admin
+  member
+
+  @@map("participant_role")
+}
+
+// ─── Messages ────────────────────────────────────────────────────────────────
+
+model Message {
+  id             String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  conversationId String      @map("conversation_id") @db.Uuid
+  senderId       String      @map("sender_id")       @db.Uuid
+  type           MessageType
+  content        String?
+  mediaUrl       String?     @map("media_url")
+  thumbUrl       String?     @map("thumb_url")
+  replyToId      String?     @map("reply_to_id")     @db.Uuid
+  isDeleted      Boolean     @default(false)         @map("is_deleted")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt      @map("updated_at")
+
+  conversation Conversation     @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User             @relation("MessagesSent", fields: [senderId], references: [id], onDelete: Cascade)
+  replyTo      Message?         @relation("MessageReplies", fields: [replyToId], references: [id], onDelete: SetNull)
+  replies      Message[]        @relation("MessageReplies")
+  receipts     MessageReceipt[]
+
+  @@index([conversationId, createdAt])
+  @@map("messages")
+}
+
+enum MessageType {
+  text
+  image
+  video
+  audio
+  document
+  voice
+  system
+
+  @@map("message_type")
+}
+
+model MessageReceipt {
+  messageId String        @map("message_id") @db.Uuid
+  userId    String        @map("user_id")    @db.Uuid
+  status    ReceiptStatus
+  timestamp DateTime      @default(now())
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([messageId, userId])
+  @@map("message_receipts")
+}
+
+enum ReceiptStatus {
+  delivered
+  read
+
+  @@map("receipt_status")
 }
